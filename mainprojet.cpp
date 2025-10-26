@@ -118,9 +118,9 @@ void drawOrbit(float radius) {
     glEnd();
     glEnable(GL_LIGHTING);
 }
-// === Dessin du système solaire ===
+// === Main solar system rendering function ===
 void drawSolarSystem() {
-    // Orbites des planètes
+    // Draw planetary orbits
     drawOrbit(3);  // Mercure
     drawOrbit(5);  // Vénus
     drawOrbit(7);  // Terre
@@ -137,7 +137,7 @@ void drawSolarSystem() {
     // Draw comet
     drawComet();
     
-    // Soleil
+    // The Sun at center
     glPushMatrix();
         GLfloat sunEmission[] = {1.0, 1.0, 0.0, 1.0};
         glMaterialfv(GL_FRONT, GL_EMISSION, sunEmission);
@@ -173,7 +173,7 @@ void drawSolarSystem() {
         glColor3f(0.2, 0.4, 0.8);
         glutSolidSphere(0.5, 20, 20);
 
-        // Lune
+        // Earth's Moon
         glPushMatrix();
             glRotatef(anglelune, 0, 1, 0);      
             glTranslatef(0.7, 0, 0);             
@@ -457,7 +457,7 @@ void displayInfo() {
         drawText(10, 520, "PAUSED");
     }
 }
-// === Affichage ===
+// === Display function - renders the entire scene ===
 void display() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
@@ -484,7 +484,7 @@ void display() {
     glutSwapBuffers();
 }
 
-// === Animation planètes ===
+// === Animation update function - updates all moving objects ===
 void update(int value) {
     if(!isPaused) {
         // Update planet angles with simulation speed multiplier
@@ -529,7 +529,7 @@ void update(int value) {
     glutTimerFunc(16, update, 0);
 }
 
-// === Caméra clavier + contrôle lumière ===
+// === Keyboard handler for camera and simulation controls ===
 void keyboard(unsigned char key, int x, int y) {
     float radY = angleY * M_PI / 180.0f;
     float forwardX = sin(radY);
@@ -593,7 +593,7 @@ void specialKeys(int key, int x, int y) {
     glutPostRedisplay();
 }
 
-// === Caméra souris ===
+// === Mouse motion handler for camera look-around ===
 void mouseMotion(int x, int y) {
     if(!isDragging) return;
     int dx = x - lastMouseX;
@@ -623,7 +623,7 @@ void reshape(int w, int h) {
     glMatrixMode(GL_MODELVIEW);
 }
 
-// === Initialisation OpenGL ===
+// === OpenGL initialization ===
 void init() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -632,11 +632,12 @@ void init() {
     initLighting();
     initStars();
     initAsteroids();
-    srand(time(NULL)); // Initialize random seed
 }
 
 // === Main ===
 int main(int argc, char** argv) {
+    srand(time(NULL)); // Initialize random seed for star and asteroid generation
+    
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
     glutInitWindowSize(1000, 600);

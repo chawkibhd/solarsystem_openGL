@@ -1,0 +1,25 @@
+# Compiled executable
+main
+
+# Object files
+*.o
+*.obj
+
+# Build directories
+build/
+bin/
+dist/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MacOS files
+.DS_Store
+
+# Backup files
+*.bak
+*~

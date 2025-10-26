@@ -1,3 +1,31 @@
+/*
+ * Enhanced Solar System 3D Simulation
+ * 
+ * An interactive OpenGL/GLUT application that simulates our solar system with:
+ * - All 8 planets plus Pluto (dwarf planet)
+ * - Earth's Moon
+ * - 1000 asteroids in a belt between Mars and Jupiter
+ * - A comet with eccentric elliptical orbit
+ * - 10,000 stars with varying brightness
+ * - Interactive camera controls (FPS-style movement)
+ * - Simulation controls (pause, speed adjustment)
+ * - Visual toggles (orbits, info display, help menu)
+ * 
+ * Controls:
+ * - ZQSD/WASD: Camera movement
+ * - A/E: Move down/up
+ * - Mouse: Look around (click and drag)
+ * - P: Pause/Resume
+ * - Up/Down: Speed control
+ * - O: Toggle orbits
+ * - I: Toggle info
+ * - H: Toggle help
+ * - 0-9: Jump to planet views
+ * - +/-: Light intensity
+ * - Space: Reset camera
+ * - ESC: Exit
+ */
+
 #define GL_SILENCE_DEPRECATION
 #ifdef __APPLE__
 #include <GLUT/glut.h>
@@ -12,17 +40,17 @@
 #include <iomanip>
 #include <ctime> 
 
-// === Caméra FPV ===
-float camX = 0.0f, camY = 5.0f, camZ = 25.0f;
-float angleX = 0.0f, angleY = 0.0f;
-float moveSpeed = 0.5f;
-float mouseSensitivity = 0.2f;
-bool isDragging = false;
-int lastMouseX = 0, lastMouseY = 0;
+// === Camera FPS (First Person Shooter style) ===
+float camX = 0.0f, camY = 5.0f, camZ = 25.0f;  // Camera position
+float angleX = 0.0f, angleY = 0.0f;             // Camera rotation angles
+float moveSpeed = 0.5f;                          // Movement speed
+float mouseSensitivity = 0.2f;                   // Mouse sensitivity for look around
+bool isDragging = false;                         // Is mouse dragging active
+int lastMouseX = 0, lastMouseY = 0;              // Last mouse position
 
-// === Lumière ===
-GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f}; 
-float lightIntensity = 2.0f;                   // Intensité globale de la lumière
+// === Lighting ===
+GLfloat lightPos[] = {0.0f, 0.0f, 0.0f, 1.0f};  // Light position at the Sun
+float lightIntensity = 2.0f;                      // Global light intensity multiplier
 
 // Forward declarations
 void drawAsteroids();
@@ -32,36 +60,37 @@ void drawText(float x, float y, const std::string& text);
 void displayHelp();
 void displayInfo();
 
-// === Angles des planètes ===
+// === Planet orbital angles (in degrees) ===
 float angleMercure = 0.0f, angleVenus = 0.0f, angleTerre = 0.0f;
 float angleMars = 0.0f, angleJupiter = 0.0f, angleSaturne = 0.0f;
 float angleUranus = 0.0f, angleNeptune = 0.0f, anglelune = 0.0f;
 float anglePluto = 0.0f;
 
 // === Simulation controls ===
-bool isPaused = false;
-float simulationSpeed = 1.0f;
-bool showOrbits = true;
-bool showHelp = false;
-bool showInfo = false;
-float simulationTime = 0.0f; // in Earth days
+bool isPaused = false;              // Is simulation paused
+float simulationSpeed = 1.0f;       // Speed multiplier (0.1x to 10x)
+bool showOrbits = true;             // Show orbital paths
+bool showHelp = false;              // Show help menu overlay
+bool showInfo = false;              // Show info panel (time, speed, position)
+float simulationTime = 0.0f;        // Elapsed simulation time in Earth days
 
 // === Asteroid belt ===
 struct Asteroid {
-    float angle;
-    float distance;
-    float speed;
-    float size;
+    float angle;      // Current orbital angle
+    float distance;   // Distance from Sun
+    float speed;      // Orbital speed
+    float size;       // Asteroid size
 };
 std::vector<Asteroid> asteroids;
-int asteroidCount = 1000;
+int asteroidCount = 1000;  // Number of asteroids in the belt
 
-// === Initialisation lumière et matériau ===
+// Initialize OpenGL lighting system
 void initLighting() {
     glEnable(GL_LIGHTING);
     glEnable(GL_LIGHT0);
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
+    // Configure light properties based on intensity
     GLfloat ambient[]  = {0.2f*lightIntensity, 0.2f*lightIntensity, 0.2f*lightIntensity, 1.0f};
     GLfloat diffuse[]  = {1.0f*lightIntensity, 1.0f*lightIntensity, 1.0f*lightIntensity, 1.0f};
     GLfloat specular[] = {1.0f*lightIntensity, 1.0f*lightIntensity, 1.0f*lightIntensity, 1.0f};
@@ -74,12 +103,13 @@ void initLighting() {
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
     glShadeModel(GL_SMOOTH);
 }
+// Draw a circular orbit path around the Sun
 void drawOrbit(float radius) {
     if(!showOrbits) return;
     glDisable(GL_LIGHTING);
-    glColor3f(0.3f, 0.3f, 0.3f); // Dimmer color for orbits
+    glColor3f(0.3f, 0.3f, 0.3f); // Dimmer gray color for subtle appearance
     glBegin(GL_LINE_LOOP);
-        for(int i=0; i<100; i++) { // 100 segments pour un cercle lisse
+        for(int i=0; i<100; i++) { // 100 segments for smooth circle
             float angle = 2 * M_PI * i / 100;
             float x = radius * cos(angle);
             float z = radius * sin(angle);
@@ -216,37 +246,38 @@ void drawSolarSystem() {
         glutSolidSphere(0.15, 15, 15);
     glPopMatrix();
 }
+// === Background stars ===
 struct Star {
-    float x, y, z;
-    float brightness;
-    float size;
+    float x, y, z;       // Position in 3D space
+    float brightness;    // Star brightness (0.5 to 1.0)
+    float size;          // Star size (1 to 3 pixels)
 };
 std::vector<Star> stars;
-int starCount = 10000;
+int starCount = 10000;  // Total number of stars
 
-// === Comet ===
+// === Comet with elliptical orbit ===
 struct Comet {
-    float angle;
-    float eccentricity;
-    float a; // semi-major axis
-    float b; // semi-minor axis
+    float angle;         // Current orbital angle
+    float eccentricity;  // Orbital eccentricity (0.8 = very elliptical)
+    float a;             // Semi-major axis
+    float b;             // Semi-minor axis
 };
 Comet comet = {0.0f, 0.8f, 30.0f, 18.0f};
 
-// Appelle une seule fois au début
+// Initialize star field with random positions and properties
 void initStars() {
     for(int i = 0; i < starCount; i++) {
         Star s;
-        s.x = (rand() % 2000 - 1000) / 10.0f;
-        s.y = (rand() % 1000 - 500) / 10.0f;
-        s.z = (rand() % 2000 - 1000) / 10.0f;
+        s.x = (rand() % 2000 - 1000) / 10.0f;    // -100 to 100
+        s.y = (rand() % 1000 - 500) / 10.0f;     // -50 to 50
+        s.z = (rand() % 2000 - 1000) / 10.0f;    // -100 to 100
         s.brightness = 0.5f + (rand() % 100) / 200.0f; // 0.5 to 1.0
-        s.size = 1.0f + (rand() % 3); // 1 to 3
+        s.size = 1.0f + (rand() % 3);            // 1 to 3 pixels
         stars.push_back(s);
     }
 }
 
-// Initialize asteroids
+// Initialize asteroid belt with random orbital parameters
 void initAsteroids() {
     for(int i = 0; i < asteroidCount; i++) {
         Asteroid a;
@@ -258,10 +289,10 @@ void initAsteroids() {
     }
 }
 
-// Dessin des étoiles fixes
+// Draw the background star field
 void drawStars() {
     glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST);  // Draw stars in background (no depth testing)
 
     glBegin(GL_POINTS);
     for(auto &s : stars) {
@@ -275,23 +306,23 @@ void drawStars() {
     glEnable(GL_LIGHTING);
 }
 
-// Draw asteroid belt
+// Draw the asteroid belt
 void drawAsteroids() {
     glDisable(GL_LIGHTING);
     for(auto &a : asteroids) {
         glPushMatrix();
             glRotatef(a.angle, 0, 1, 0);
             glTranslatef(a.distance, 0, 0);
-            glColor3f(0.5f, 0.4f, 0.3f); // Brown-gray color
+            glColor3f(0.5f, 0.4f, 0.3f); // Brown-gray rocky color
             glutSolidSphere(a.size, 8, 8);
         glPopMatrix();
     }
     glEnable(GL_LIGHTING);
 }
 
-// Draw comet with tail
+// Draw comet with glowing tail
 void drawComet() {
-    // Calculate position using elliptical orbit
+    // Calculate elliptical orbit position
     float angleRad = comet.angle * M_PI / 180.0f;
     float r = (comet.a * comet.b) / sqrt(pow(comet.b * cos(angleRad), 2) + pow(comet.a * sin(angleRad), 2));
     float x = r * cos(angleRad);
@@ -299,11 +330,11 @@ void drawComet() {
     
     glDisable(GL_LIGHTING);
     
-    // Draw tail
+    // Draw tail pointing away from the Sun
     glBegin(GL_TRIANGLE_FAN);
     glColor4f(0.7f, 0.9f, 1.0f, 0.8f);
     glVertex3f(x, 0, z);
-    glColor4f(0.7f, 0.9f, 1.0f, 0.0f);
+    glColor4f(0.7f, 0.9f, 1.0f, 0.0f);  // Fade to transparent
     for(int i = 0; i <= 10; i++) {
         float tailAngle = (comet.angle + 180) * M_PI / 180.0f + (i - 5) * 0.2f;
         float tailDist = 2.0f;
@@ -311,7 +342,7 @@ void drawComet() {
     }
     glEnd();
     
-    // Draw comet head
+    // Draw bright comet head
     glPushMatrix();
         glTranslatef(x, 0, z);
         glColor3f(0.9f, 0.95f, 1.0f);

@@ -294,13 +294,18 @@ void drawStars() {
     glDisable(GL_LIGHTING);
     glDisable(GL_DEPTH_TEST);  // Draw stars in background (no depth testing)
 
-    glBegin(GL_POINTS);
-    for(auto &s : stars) {
-        glColor3f(s.brightness, s.brightness, s.brightness);
-        glPointSize(s.size);
-        glVertex3f(s.x, s.y, s.z);
+    // Group stars by size for better performance
+    for(int size = 1; size <= 3; ++size) {
+        glPointSize((GLfloat)size);
+        glBegin(GL_POINTS);
+        for(auto &s : stars) {
+            if((int)(s.size + 0.5f) == size) {  // Round to nearest int
+                glColor3f(s.brightness, s.brightness, s.brightness);
+                glVertex3f(s.x, s.y, s.z);
+            }
+        }
+        glEnd();
     }
-    glEnd();
     
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
@@ -324,9 +329,14 @@ void drawAsteroids() {
 void drawComet() {
     // Calculate elliptical orbit position
     float angleRad = comet.angle * M_PI / 180.0f;
-    float r = (comet.a * comet.b) / sqrt(pow(comet.b * cos(angleRad), 2) + pow(comet.a * sin(angleRad), 2));
-    float x = r * cos(angleRad);
-    float z = r * sin(angleRad);
+    float cosAngle = cos(angleRad);
+    float sinAngle = sin(angleRad);
+    // Optimize: use multiplication instead of pow() for better performance
+    float bCos = comet.b * cosAngle;
+    float aSin = comet.a * sinAngle;
+    float r = (comet.a * comet.b) / sqrt(bCos * bCos + aSin * aSin);
+    float x = r * cosAngle;
+    float z = r * sinAngle;
     
     glDisable(GL_LIGHTING);
     
